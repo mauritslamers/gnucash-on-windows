@@ -54,6 +54,10 @@ E.g. C:\msys64.
 Optional. A switch value. If true the toolchain will build x86_64
 binaries; if false it will build i686 binaries. Defaults to false.
 
+.PARAMETER appveyor
+Optional. A switch value. If true, certain aspects will be skipped
+which can block the continuous integration.
+
 .PARAMETER preferred_mirror
 
 Optional. A URI to a preferred repository mirror for both the
@@ -68,7 +72,8 @@ Param(
 	[Parameter()] [string]$download_dir = "$target_dir\\downloads",
 	[Parameter()] [string]$msys2_root = "$target_dir\\msys2",
 	[Parameter()] [switch]$x86_64,
-	[Parameter()] [string]$preferred_mirror = "http://repo.msys2.org"
+	[Parameter()] [string]$preferred_mirror = "http://repo.msys2.org",
+    [Parameter()] [switch]$appveyor
 )
 
 $bash_path = "$msys2_root\\usr\\bin\\bash.exe"
@@ -188,23 +193,24 @@ if ($PSBoundParameters.ContainsKey('preferred_mirror')) {
     Set-Content -NoNewline -Value $pacmanconf -Path "$pacmanconf_path"
 }
 
-# Install Html Help Workshop
+if (!$appveyor) {
+    # Install Html Help Workshop
 
-$html_help_workshop_url =  "http://download.microsoft.com/download/0/a/9/0a939ef6-e31c-430f-a3df-dfae7960d564/htmlhelp.exe"
-$html_help_workshop_installer = "htmlhelp.exe"
+    $html_help_workshop_url =  "http://download.microsoft.com/download/0/a/9/0a939ef6-e31c-430f-a3df-dfae7960d564/htmlhelp.exe"
+    $html_help_workshop_installer = "htmlhelp.exe"
 
-$installed_hh = get-item -path "hkcu:\SOFTWARE\Microsoft\HTML Help Workshop" | foreach-object{$_.GetValue("InstallDir")}
+    $installed_hh = get-item -path "hkcu:\SOFTWARE\Microsoft\HTML Help Workshop" | foreach-object{$_.GetValue("InstallDir")}
 
-if (! (($installed_hh) -and (test-path -path $installed_hh))) {
-  install-package -url $html_help_workshop_url -download_file "$download_dir\\$html_help_workshop_installer" -install_dir ${env:ProgramFiles(x86)} -setup_cmd $html_help_workshop_installer
+    if (! (($installed_hh) -and (test-path -path $installed_hh))) {
+    install-package -url $html_help_workshop_url -download_file "$download_dir\\$html_help_workshop_installer" -install_dir ${env:ProgramFiles(x86)} -setup_cmd $html_help_workshop_installer
+    }
+    $hhctrl_ocx = "c:\Windows\System32\hhctrl.ocx"
+    if (!(test-path -path $hhctrl_ocx)) {
+        write-host "Something's wrong with HTML Help Workshop, couldn't find $hhctrl_ocx."
+        exit
+    }
+    $hhctrl_ocx = make-unixpath -path $hhctrl_ocx
 }
-$hhctrl_ocx = "c:\Windows\System32\hhctrl.ocx"
-if (!(test-path -path $hhctrl_ocx)) {
-    write-host "Something's wrong with HTML Help Workshop, couldn't find $hhctrl_ocx."
-    exit
-}
-$hhctrl_ocx = make-unixpath -path $hhctrl_ocx
-
 
 # Install Inno Setup
 if (!(test-path -path ${env:ProgramFiles(x86)}\inno)) {
